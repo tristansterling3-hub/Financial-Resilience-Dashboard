@@ -1,0 +1,46 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Streamlit cache and logs
+.streamlit/config.toml
+.streamlit/secrets.toml
+**/.streamlit/cache/
+**/.streamlit/logs/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Data exports or local files
+*.csv
+*.xlsx
+*.json
+*.geojson
+data/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# VSCode and IDE settings
+.vscode/
+.idea/
+
+# Python environment files
+Pipfile
+Pipfile.lock
+poetry.lock
+
+# Misc
+*.log
+*.bak
+*.tmp
