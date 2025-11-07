@@ -34,9 +34,22 @@ def load_census_data():
 # Load hosted GeoJSON
 @st.cache_data
 def load_geojson():
-    url = "https://services1.arcgis.com/0L95CJ0VTaxqcmED/arcgis/rest/services/NC_County_Boundaries/FeatureServer/0/query?where=1%3D1&outFields=COUNTY_NAME&outSR=4326&f=geojson"
+    url = "https://raw.githubusercontent.com/sieger1010/NorthCarolina-GeoJson/main/NCCountiesComplete.geo.json"
     response = requests.get(url)
-    return response.json()
+
+    if response.status_code != 200:
+        st.error(f"GeoJSON request failed with status code {response.status_code}")
+        st.text(response.text)
+        st.stop()
+
+    try:
+        geojson = response.json()
+    except Exception as e:
+        st.error(f"Failed to parse GeoJSON: {e}")
+        st.text(response.text)
+        st.stop()
+
+    return geojson
 
 df = load_census_data()
 geojson = load_geojson()
@@ -109,7 +122,7 @@ fig_map = px.choropleth(
     df,
     geojson=geojson,
     locations="County",
-    featureidkey="properties.COUNTY_NAME",
+    featureidkey="properties.NAME",
     color="Resilience_Score",
     color_continuous_scale="Viridis",
     labels={"Resilience_Score": "Resilience Score"},
