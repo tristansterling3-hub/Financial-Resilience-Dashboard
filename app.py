@@ -2,24 +2,33 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
+import json
 
 # Page setup
 st.set_page_config(page_title="NC County Resilience Dashboard", layout="wide")
 
-# Load data from Census API
+# Load Census data
 @st.cache_data
 def load_census_data():
     API_KEY = "c3b895c40dc66379b8b94a7716a0832ebea452d7"
-    url = f"https://api.census.gov/data/2022/acs/acs5?get=NAME,B19013_001E&for=county:*&in=state:37&key={API_KEY}"
+    url = f"https://api.census.gov/data/2022/acs/acs5?get=NAME,B19013_001E,state,county&for=county:*&in=state:37&key={API_KEY}"
     response = requests.get(url)
     data = response.json()
     df = pd.DataFrame(data[1:], columns=data[0])
     df.rename(columns={"B19013_001E": "Median_Income"}, inplace=True)
     df["Median_Income"] = pd.to_numeric(df["Median_Income"], errors="coerce")
     df["County"] = df["NAME"].str.replace(" County, North Carolina", "", regex=False)
+    df["FIPS"] = df["state"] + df["county"]
     return df
 
+# Load GeoJSON
+@st.cache_data
+def load_geojson():
+    with open("data/nc_counties.geojson") as f:
+        return json.load(f)
+
 df = load_census_data()
+geojson = load_geojson()
 
 # Sidebar: Weight sliders
 st.sidebar.header("Adjust Score Weights")
@@ -36,21 +45,21 @@ st.sidebar.write(f"- Income: {w_income:.2f}")
 st.sidebar.write(f"- Unemployment: {w_unemp:.2f}")
 st.sidebar.write(f"- Cost: {w_cost:.2f}")
 
-# Normalize income for scoring
+# Normalize income
 df["Income_Norm"] = (df["Median_Income"] - df["Median_Income"].min()) / (df["Median_Income"].max() - df["Median_Income"].min())
 
-# Placeholder columns for future data
+# Placeholder columns
 df["Unemployment_Norm"] = 0.5
 df["Cost_Norm"] = 0.5
 
-# Calculate Resilience Score
+# Resilience Score
 df["Resilience_Score"] = (
     w_income * df["Income_Norm"] +
     w_unemp * (1 - df["Unemployment_Norm"]) +
     w_cost * (1 - df["Cost_Norm"])
 ).round(3)
 
-# App Header
+# Header
 st.title("North Carolina County Financial Resilience Dashboard")
 st.markdown("Explore financial resilience across NC counties using live Census data.")
 
@@ -74,14 +83,28 @@ st.markdown(f"Insight: {insight}")
 
 # Bar Chart
 st.subheader("County Comparison")
-fig = px.bar(
+fig_bar = px.bar(
     df.sort_values("Resilience_Score", ascending=False),
     x="County", y="Resilience_Score",
     title="Financial Resilience by County",
     labels={"Resilience_Score": "Resilience Score"},
     height=500
 )
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig_bar, use_container_width=True)
+
+# Choropleth Map
+st.subheader("North Carolina County Resilience Map")
+fig_map = px.choropleth(
+    df,
+    geojson=geojson,
+    locations="FIPS",
+    color="Resilience_Score",
+    color_continuous_scale="Viridis",
+    labels={"Resilience_Score": "Resilience Score"},
+    title="Resilience Score by County",
+)
+fig_map.update_geos(fitbounds="locations", visible=False)
+st.plotly_chart(fig_map, use_container_width=True)
 
 # Score Breakdown Table
 st.subheader("Resilience Score Breakdown")
