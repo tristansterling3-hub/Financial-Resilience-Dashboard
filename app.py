@@ -13,7 +13,19 @@ def load_census_data():
     API_KEY = "c3b895c40dc66379b8b94a7716a0832ebea452d7"
     url = f"https://api.census.gov/data/2022/acs/acs5?get=NAME,B19013_001E,state,county&for=county:*&in=state:37&key={API_KEY}"
     response = requests.get(url)
-    data = response.json()
+
+    # Check for errors
+    if response.status_code != 200:
+        st.error(f"Census API request failed with status code {response.status_code}")
+        st.stop()
+
+    try:
+        data = response.json()
+    except Exception as e:
+        st.error(f"Failed to parse JSON: {e}")
+        st.text(response.text)  # Show raw response for debugging
+        st.stop()
+
     df = pd.DataFrame(data[1:], columns=data[0])
     df.rename(columns={"B19013_001E": "Median_Income"}, inplace=True)
     df["Median_Income"] = pd.to_numeric(df["Median_Income"], errors="coerce")
