@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
-import json
 
 # Page setup
 st.set_page_config(page_title="NC County Resilience Dashboard", layout="wide")
@@ -30,14 +29,14 @@ def load_census_data():
     df.rename(columns={"B19013_001E": "Median_Income"}, inplace=True)
     df["Median_Income"] = pd.to_numeric(df["Median_Income"], errors="coerce")
     df["County"] = df["NAME"].str.replace(" County, North Carolina", "", regex=False)
-    df["FIPS"] = df["state"] + df["county"]
     return df
 
-# Load GeoJSON
+# Load hosted GeoJSON
 @st.cache_data
 def load_geojson():
-    with open("data/nc_counties.geojson") as f:
-        return json.load(f)
+    url = "https://services1.arcgis.com/0L95CJ0VTaxqcmED/arcgis/rest/services/NC_County_Boundaries/FeatureServer/0/query?where=1%3D1&outFields=COUNTY_NAME&outSR=4326&f=geojson"
+    response = requests.get(url)
+    return response.json()
 
 df = load_census_data()
 geojson = load_geojson()
@@ -109,7 +108,8 @@ st.subheader("North Carolina County Resilience Map")
 fig_map = px.choropleth(
     df,
     geojson=geojson,
-    locations="FIPS",
+    locations="County",
+    featureidkey="properties.COUNTY_NAME",
     color="Resilience_Score",
     color_continuous_scale="Viridis",
     labels={"Resilience_Score": "Resilience Score"},
