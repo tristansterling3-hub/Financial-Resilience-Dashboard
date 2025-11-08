@@ -88,7 +88,7 @@ df["Resilience_Score"] = (
 # -------------------------------
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import FAISS
-from langchain_community.chains import RetrievalQA
+from langchain.chains import RetrievalQA   # ✅ stays in core langchain
 from langchain.docstore.document import Document
 
 openai.api_key = st.secrets["OPENAI_API_KEY"]
