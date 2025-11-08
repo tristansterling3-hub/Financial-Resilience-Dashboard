@@ -71,18 +71,29 @@ st.sidebar.write(f"- Unemployment: {w_unemp:.2f}")
 st.sidebar.write(f"- Cost: {w_cost:.2f}")
 
 # -------------------------------
-# 🧠 AI Assistant (RAG or GPT)
+# Calculate Resilience Score FIRST
 # -------------------------------
-import openai
-from langchain.embeddings.openai import OpenAIEmbeddings
+df["Income_Norm"] = (df["Median_Income"] - df["Median_Income"].min()) / (df["Median_Income"].max() - df["Median_Income"].min())
+df["Unemployment_Norm"] = 0.5  # placeholder
+df["Cost_Norm"] = 0.5          # placeholder
+
+df["Resilience_Score"] = (
+    w_income * df["Income_Norm"] +
+    w_unemp * (1 - df["Unemployment_Norm"]) +
+    w_cost * (1 - df["Cost_Norm"])
+).round(3)
+
+# -------------------------------
+# 🧠 AI Assistant (RAG)
+# -------------------------------
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.vectorstores import FAISS
 from langchain.chains import RetrievalQA
-from langchain.chat_models import ChatOpenAI
 from langchain.docstore.document import Document
 
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# Build documents from your dataframe
+# Build documents from dataframe
 docs = []
 for _, row in df.iterrows():
     text = f"County: {row['County']}, Median Income: {row['Median_Income']}, Resilience Score: {row['Resilience_Score']}"
@@ -109,23 +120,11 @@ if user_question:
 
     with st.sidebar.expander("Sources"):
         for doc in result["source_documents"]:
-            st.sidebar.write(doc.page_content)  
+            st.sidebar.write(doc.page_content)
 
-# Normalize income
-df["Income_Norm"] = (df["Median_Income"] - df["Median_Income"].min()) / (df["Median_Income"].max() - df["Median_Income"].min())
-
-# Placeholder columns
-df["Unemployment_Norm"] = 0.5
-df["Cost_Norm"] = 0.5
-
-# Resilience Score
-df["Resilience_Score"] = (
-    w_income * df["Income_Norm"] +
-    w_unemp * (1 - df["Unemployment_Norm"]) +
-    w_cost * (1 - df["Cost_Norm"])
-).round(3)
-
-# Header
+# -------------------------------
+# Dashboard Visualizations
+# -------------------------------
 st.title("North Carolina County Financial Resilience Dashboard")
 st.markdown("Explore financial resilience across NC counties using live Census data.")
 
