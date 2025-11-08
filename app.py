@@ -71,30 +71,45 @@ st.sidebar.write(f"- Unemployment: {w_unemp:.2f}")
 st.sidebar.write(f"- Cost: {w_cost:.2f}")
 
 # -------------------------------
-# 🧠 AI Assistant (OpenAI-powered)
+# 🧠 AI Assistant (RAG or GPT)
 # -------------------------------
+import openai
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.vectorstores import FAISS
+from langchain.chains import RetrievalQA
+from langchain.chat_models import ChatOpenAI
+from langchain.docstore.document import Document
+
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
+# Build documents from your dataframe
+docs = []
+for _, row in df.iterrows():
+    text = f"County: {row['County']}, Median Income: {row['Median_Income']}, Resilience Score: {row['Resilience_Score']}"
+    docs.append(Document(page_content=text))
+
+embeddings = OpenAIEmbeddings(openai_api_key=st.secrets["OPENAI_API_KEY"])
+vectorstore = FAISS.from_documents(docs, embeddings)
+
+retriever = vectorstore.as_retriever()
+qa_chain = RetrievalQA.from_chain_type(
+    llm=ChatOpenAI(model="gpt-4", temperature=0.2, openai_api_key=st.secrets["OPENAI_API_KEY"]),
+    retriever=retriever,
+    return_source_documents=True
+)
+
 st.sidebar.markdown("---")
-st.sidebar.subheader("🧠 AI Assistant")
-user_question = st.sidebar.text_area("Ask about future risks or interventions")
+st.sidebar.subheader("🧠 AI Assistant (RAG)")
+user_question = st.sidebar.text_area("Ask about county resilience")
 
 if user_question:
+    result = qa_chain({"query": user_question})
     st.sidebar.markdown("**AI Response:**")
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",  # or "gpt-3.5-turbo"
-            messages=[
-                {"role": "system", "content": "You are an expert in disaster resilience and community planning. Provide actionable insights for North Carolina counties."},
-                {"role": "user", "content": user_question}
-            ],
-            temperature=0.7,
-            max_tokens=300
-        )
-        answer = response["choices"][0]["message"]["content"]
-        st.sidebar.write(answer)
-    except Exception as e:
-        st.sidebar.error(f"AI request failed: {e}")
+    st.sidebar.write(result["result"])
+
+    with st.sidebar.expander("Sources"):
+        for doc in result["source_documents"]:
+            st.sidebar.write(doc.page_content)  
 
 # Normalize income
 df["Income_Norm"] = (df["Median_Income"] - df["Median_Income"].min()) / (df["Median_Income"].max() - df["Median_Income"].min())
