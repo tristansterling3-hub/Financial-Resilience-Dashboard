@@ -6,11 +6,15 @@ import plotly.express as px
 # Page setup
 st.set_page_config(page_title="NC County Resilience Dashboard", layout="wide")
 
-# Load Census data
+# Load Census data with additional variables
 @st.cache_data
 def load_census_data():
     API_KEY = "c3b895c40dc66379b8b94a7716a0832ebea452d7"
-    url = f"https://api.census.gov/data/2022/acs/acs5?get=NAME,B19013_001E&for=county:*&in=state:37&key={API_KEY}"
+    url = (
+        "https://api.census.gov/data/2022/acs/acs5?"
+        "get=NAME,B19013_001E,B23025_005E,B23025_003E&"
+        "for=county:*&in=state:37&key={API_KEY}"
+    )
     response = requests.get(url)
 
     if response.status_code != 200:
@@ -26,9 +30,23 @@ def load_census_data():
         st.stop()
 
     df = pd.DataFrame(data[1:], columns=data[0])
-    df.rename(columns={"B19013_001E": "Median_Income"}, inplace=True)
+    df.rename(columns={
+        "B19013_001E": "Median_Income",
+        "B23025_005E": "Unemployed",
+        "B23025_003E": "Labor_Force"
+    }, inplace=True)
+
+    # Convert columns to numeric
     df["Median_Income"] = pd.to_numeric(df["Median_Income"], errors="coerce")
+    df["Unemployed"] = pd.to_numeric(df["Unemployed"], errors="coerce")
+    df["Labor_Force"] = pd.to_numeric(df["Labor_Force"], errors="coerce")
+
+    # Calculate unemployment rate
+    df["Unemployment_Rate"] = df["Unemployed"] / df["Labor_Force"]
+
+    # Clean up county names
     df["County"] = df["NAME"].str.replace(" County, North Carolina", "", regex=False)
+
     return df
 
 # Load hosted GeoJSON
@@ -69,7 +87,8 @@ st.sidebar.write(f"- Income: {w_income:.2f}")
 st.sidebar.write(f"- Unemployment: {w_unemp:.2f}")
 st.sidebar.write(f"- Cost: {w_cost:.2f}")
 
-# AI Assistant
+
+# AI Assistant // Ai Generated
 st.sidebar.markdown("---")
 st.sidebar.subheader("🧠 AI Assistant")
 user_question = st.sidebar.text_area("Ask about future risks or interventions")
@@ -88,14 +107,14 @@ if user_question:
     else:
         st.sidebar.write("I'm analyzing your question. Try asking about specific risks, counties, or interventions.")
 
-# Normalize income
+# Normalize income and unemployment rate
 df["Income_Norm"] = (df["Median_Income"] - df["Median_Income"].min()) / (df["Median_Income"].max() - df["Median_Income"].min())
+df["Unemployment_Norm"] = (df["Unemployment_Rate"] - df["Unemployment_Rate"].min()) / (df["Unemployment_Rate"].max() - df["Unemployment_Rate"].min())
 
-# Placeholder columns
-df["Unemployment_Norm"] = 0.5
+# Placeholder for cost of living normalization
 df["Cost_Norm"] = 0.5
 
-# Resilience Score
+# Recalculate Resilience Score
 df["Resilience_Score"] = (
     w_income * df["Income_Norm"] +
     w_unemp * (1 - df["Unemployment_Norm"]) +
@@ -135,15 +154,6 @@ fig_bar = px.bar(
 )
 st.plotly_chart(fig_bar, use_container_width=True)
 
-# Sidebar: Dynamic color scale for the map
-st.sidebar.subheader("Map Color Scale")
-min_scale = st.sidebar.slider("Minimum Scale", float(df["Resilience_Score"].min()), float(df["Resilience_Score"].max()), float(df["Resilience_Score"].min()), 0.01)
-max_scale = st.sidebar.slider("Maximum Scale", float(df["Resilience_Score"].min()), float(df["Resilience_Score"].max()), float(df["Resilience_Score"].max()), 0.01)
-
-# Ensure min_scale is less than max_scale
-if min_scale >= max_scale:
-    st.sidebar.error("Minimum scale must be less than maximum scale.")
-
 # Choropleth Map
 st.subheader("North Carolina County Resilience Map")
 fig_map = px.choropleth(
@@ -153,7 +163,6 @@ fig_map = px.choropleth(
     featureidkey="properties.NAME",
     color="Resilience_Score",
     color_continuous_scale="Viridis",
-    range_color=[min_scale, max_scale],  # Dynamic range for the color scale
     labels={"Resilience_Score": "Resilience Score"},
     title="Resilience Score by County",
 )
