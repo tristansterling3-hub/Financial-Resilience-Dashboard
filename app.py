@@ -87,8 +87,8 @@ df["Resilience_Score"] = (
 # 🧠 AI Assistant (RAG)
 # -------------------------------
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.chains import RetrievalQA
+from langchain_community.vectorstores import FAISS
+from langchain_community.chains import RetrievalQA
 from langchain.docstore.document import Document
 
 openai.api_key = st.secrets["OPENAI_API_KEY"]
