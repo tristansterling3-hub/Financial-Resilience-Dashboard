@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
+import openai
 
 # Page setup
 st.set_page_config(page_title="NC County Resilience Dashboard", layout="wide")
@@ -69,24 +70,31 @@ st.sidebar.write(f"- Income: {w_income:.2f}")
 st.sidebar.write(f"- Unemployment: {w_unemp:.2f}")
 st.sidebar.write(f"- Cost: {w_cost:.2f}")
 
-# AI Assistant
+# -------------------------------
+# 🧠 AI Assistant (OpenAI-powered)
+# -------------------------------
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+
 st.sidebar.markdown("---")
 st.sidebar.subheader("🧠 AI Assistant")
 user_question = st.sidebar.text_area("Ask about future risks or interventions")
 
 if user_question:
     st.sidebar.markdown("**AI Response:**")
-    q = user_question.lower()
-    if "flood" in q:
-        st.sidebar.write("Eastern counties like Craven and Pamlico may face elevated flood risk next month. Consider pre-positioning shelters and medical supplies.")
-    elif "low-income" in q:
-        st.sidebar.write("Low-income counties with low resilience scores should receive priority for housing repair grants and mobile health units.")
-    elif "hurricane" in q:
-        st.sidebar.write("Post-hurricane resource allocation should focus on counties with high population density and low resilience scores, such as Robeson and Columbus.")
-    elif "intervention" in q or "resource" in q:
-        st.sidebar.write("Use resilience scores to guide proactive interventions. Prioritize counties with low scores and high population density.")
-    else:
-        st.sidebar.write("I'm analyzing your question. Try asking about specific risks, counties, or interventions.")
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",  # or "gpt-3.5-turbo"
+            messages=[
+                {"role": "system", "content": "You are an expert in disaster resilience and community planning. Provide actionable insights for North Carolina counties."},
+                {"role": "user", "content": user_question}
+            ],
+            temperature=0.7,
+            max_tokens=300
+        )
+        answer = response["choices"][0]["message"]["content"]
+        st.sidebar.write(answer)
+    except Exception as e:
+        st.sidebar.error(f"AI request failed: {e}")
 
 # Normalize income
 df["Income_Norm"] = (df["Median_Income"] - df["Median_Income"].min()) / (df["Median_Income"].max() - df["Median_Income"].min())
