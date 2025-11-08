@@ -135,6 +135,15 @@ fig_bar = px.bar(
 )
 st.plotly_chart(fig_bar, use_container_width=True)
 
+# Sidebar: Dynamic color scale for the map
+st.sidebar.subheader("Map Color Scale")
+min_scale = st.sidebar.slider("Minimum Scale", float(df["Resilience_Score"].min()), float(df["Resilience_Score"].max()), float(df["Resilience_Score"].min()), 0.01)
+max_scale = st.sidebar.slider("Maximum Scale", float(df["Resilience_Score"].min()), float(df["Resilience_Score"].max()), float(df["Resilience_Score"].max()), 0.01)
+
+# Ensure min_scale is less than max_scale
+if min_scale >= max_scale:
+    st.sidebar.error("Minimum scale must be less than maximum scale.")
+
 # Choropleth Map
 st.subheader("North Carolina County Resilience Map")
 fig_map = px.choropleth(
@@ -144,6 +153,7 @@ fig_map = px.choropleth(
     featureidkey="properties.NAME",
     color="Resilience_Score",
     color_continuous_scale="Viridis",
+    range_color=[min_scale, max_scale],  # Dynamic range for the color scale
     labels={"Resilience_Score": "Resilience Score"},
     title="Resilience Score by County",
 )
