@@ -2,8 +2,3 @@ streamlit
 pandas
 requests
 plotly
-openai
-langchain
-langchain-community
-langchain-openai
-faiss-cpu

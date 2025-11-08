@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
-import openai
 
 # Page setup
 st.set_page_config(page_title="NC County Resilience Dashboard", layout="wide")
@@ -70,61 +69,40 @@ st.sidebar.write(f"- Income: {w_income:.2f}")
 st.sidebar.write(f"- Unemployment: {w_unemp:.2f}")
 st.sidebar.write(f"- Cost: {w_cost:.2f}")
 
-# -------------------------------
-# Calculate Resilience Score FIRST
-# -------------------------------
-df["Income_Norm"] = (df["Median_Income"] - df["Median_Income"].min()) / (df["Median_Income"].max() - df["Median_Income"].min())
-df["Unemployment_Norm"] = 0.5  # placeholder
-df["Cost_Norm"] = 0.5          # placeholder
+# AI Assistant
+st.sidebar.markdown("---")
+st.sidebar.subheader("🧠 AI Assistant")
+user_question = st.sidebar.text_area("Ask about future risks or interventions")
 
+if user_question:
+    st.sidebar.markdown("**AI Response:**")
+    q = user_question.lower()
+    if "flood" in q:
+        st.sidebar.write("Eastern counties like Craven and Pamlico may face elevated flood risk next month. Consider pre-positioning shelters and medical supplies.")
+    elif "low-income" in q:
+        st.sidebar.write("Low-income counties with low resilience scores should receive priority for housing repair grants and mobile health units.")
+    elif "hurricane" in q:
+        st.sidebar.write("Post-hurricane resource allocation should focus on counties with high population density and low resilience scores, such as Robeson and Columbus.")
+    elif "intervention" in q or "resource" in q:
+        st.sidebar.write("Use resilience scores to guide proactive interventions. Prioritize counties with low scores and high population density.")
+    else:
+        st.sidebar.write("I'm analyzing your question. Try asking about specific risks, counties, or interventions.")
+
+# Normalize income
+df["Income_Norm"] = (df["Median_Income"] - df["Median_Income"].min()) / (df["Median_Income"].max() - df["Median_Income"].min())
+
+# Placeholder columns
+df["Unemployment_Norm"] = 0.5
+df["Cost_Norm"] = 0.5
+
+# Resilience Score
 df["Resilience_Score"] = (
     w_income * df["Income_Norm"] +
     w_unemp * (1 - df["Unemployment_Norm"]) +
     w_cost * (1 - df["Cost_Norm"])
 ).round(3)
 
-# -------------------------------
-# 🧠 AI Assistant (RAG)
-# -------------------------------
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain_community.vectorstores import FAISS
-from langchain.chains.retrieval_qa.base import RetrievalQA
-from langchain.docstore.document import Document
-
-openai.api_key = st.secrets["OPENAI_API_KEY"]
-
-# Build documents from dataframe
-docs = []
-for _, row in df.iterrows():
-    text = f"County: {row['County']}, Median Income: {row['Median_Income']}, Resilience Score: {row['Resilience_Score']}"
-    docs.append(Document(page_content=text))
-
-embeddings = OpenAIEmbeddings(openai_api_key=st.secrets["OPENAI_API_KEY"])
-vectorstore = FAISS.from_documents(docs, embeddings)
-
-retriever = vectorstore.as_retriever()
-qa_chain = RetrievalQA.from_chain_type(
-    llm=ChatOpenAI(model="gpt-4", temperature=0.2, openai_api_key=st.secrets["OPENAI_API_KEY"]),
-    retriever=retriever,
-    return_source_documents=True
-)
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("🧠 AI Assistant (RAG)")
-user_question = st.sidebar.text_area("Ask about county resilience")
-
-if user_question:
-    result = qa_chain({"query": user_question})
-    st.sidebar.markdown("**AI Response:**")
-    st.sidebar.write(result["result"])
-
-    with st.sidebar.expander("Sources"):
-        for doc in result["source_documents"]:
-            st.sidebar.write(doc.page_content)
-
-# -------------------------------
-# Dashboard Visualizations
-# -------------------------------
+# Header
 st.title("North Carolina County Financial Resilience Dashboard")
 st.markdown("Explore financial resilience across NC counties using live Census data.")
 
