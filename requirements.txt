@@ -2,3 +2,7 @@ streamlit
 pandas
 requests
 plotly
+seaborn
+matplotlib
+folium
+streamlit-folium

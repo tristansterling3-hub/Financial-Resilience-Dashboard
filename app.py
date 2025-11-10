@@ -7,10 +7,14 @@ import matplotlib.pyplot as plt
 import folium
 from streamlit_folium import folium_static
 
+# -------------------------------
 # Page setup
+# -------------------------------
 st.set_page_config(page_title="NC County Resilience Dashboard", layout="wide")
 
+# -------------------------------
 # Load Census data
+# -------------------------------
 @st.cache_data
 def load_census_data():
     API_KEY = "c3b895c40dc66379b8b94a7716a0832ebea452d7"
@@ -35,7 +39,9 @@ def load_census_data():
     df["County"] = df["NAME"].str.replace(" County, North Carolina", "", regex=False)
     return df
 
+# -------------------------------
 # Load hosted GeoJSON
+# -------------------------------
 @st.cache_data
 def load_geojson():
     url = "https://raw.githubusercontent.com/sieger1010/NorthCarolina-GeoJson/main/NCCountiesComplete.geo.json"
@@ -58,7 +64,9 @@ def load_geojson():
 df = load_census_data()
 geojson = load_geojson()
 
+# -------------------------------
 # Sidebar: Weight sliders
+# -------------------------------
 st.sidebar.header("Adjust Score Weights")
 w_income = st.sidebar.slider("Weight: Income", 0.0, 1.0, 1.0, 0.05)
 w_unemp = st.sidebar.slider("Weight: Unemployment", 0.0, 1.0, 0.0, 0.05)
@@ -68,30 +76,36 @@ w_cost = st.sidebar.slider("Weight: Cost of Living", 0.0, 1.0, 0.0, 0.05)
 total = w_income + w_unemp + w_cost
 w_income, w_unemp, w_cost = w_income / total, w_unemp / total, w_cost / total
 
-st.sidebar.markdown("Normalized Weights")
+st.sidebar.markdown("**Normalized Weights**")
 st.sidebar.write(f"- Income: {w_income:.2f}")
 st.sidebar.write(f"- Unemployment: {w_unemp:.2f}")
 st.sidebar.write(f"- Cost: {w_cost:.2f}")
 
-# Normalize income
+# -------------------------------
+# Normalize values
+# -------------------------------
 df["Income_Norm"] = (df["Median_Income"] - df["Median_Income"].min()) / (df["Median_Income"].max() - df["Median_Income"].min())
+df["Unemployment_Norm"] = 0.5   # placeholder
+df["Cost_Norm"] = 0.5           # placeholder
 
-# Placeholder columns
-df["Unemployment_Norm"] = 0.5
-df["Cost_Norm"] = 0.5
-
+# -------------------------------
 # Resilience Score
+# -------------------------------
 df["Resilience_Score"] = (
     w_income * df["Income_Norm"] +
     w_unemp * (1 - df["Unemployment_Norm"]) +
     w_cost * (1 - df["Cost_Norm"])
 ).round(3)
 
+# -------------------------------
 # Header
+# -------------------------------
 st.title("North Carolina County Financial Resilience Dashboard")
 st.markdown("Explore financial resilience across NC counties using live Census data.")
 
+# -------------------------------
 # County Selector
+# -------------------------------
 selected_county = st.selectbox("Select a County", df["County"].sort_values())
 score = df[df["County"] == selected_county]["Resilience_Score"].values[0]
 st.metric(label=f"{selected_county} Resilience Score", value=round(score, 3))
@@ -109,7 +123,9 @@ elif income < 0.4: comment.append("low income levels")
 insight = "This score reflects " + ", ".join(comment) + "." if comment else "This county has balanced income levels."
 st.markdown(f"Insight: {insight}")
 
+# -------------------------------
 # Bar Chart
+# -------------------------------
 st.subheader("County Comparison")
 fig_bar = px.bar(
     df.sort_values("Resilience_Score", ascending=False),
@@ -120,30 +136,40 @@ fig_bar = px.bar(
 )
 st.plotly_chart(fig_bar, use_container_width=True)
 
-# Choropleth Map
+# -------------------------------
+# Choropleth Map (dynamic scale)
+# -------------------------------
 st.subheader("North Carolina County Resilience Map")
+color_scale = st.sidebar.selectbox("Color Scale", ["Viridis", "Plasma", "Cividis", "Inferno", "Turbo"])
+min_val = st.sidebar.slider("Min Scale", float(df["Resilience_Score"].min()), float(df["Resilience_Score"].max()), float(df["Resilience_Score"].min()))
+max_val = st.sidebar.slider("Max Scale", float(df["Resilience_Score"].min()), float(df["Resilience_Score"].max()), float(df["Resilience_Score"].max()))
+
 fig_map = px.choropleth(
     df,
     geojson=geojson,
     locations="County",
     featureidkey="properties.NAME",
     color="Resilience_Score",
-    color_continuous_scale="Viridis",
-    range_color=[df["Resilience_Score"].min(), df["Resilience_Score"].max()],
+    color_continuous_scale=color_scale,
+    range_color=[min_val, max_val],
     labels={"Resilience_Score": "Resilience Score"},
     title="Resilience Score by County",
 )
 fig_map.update_geos(fitbounds="locations", visible=False)
 st.plotly_chart(fig_map, use_container_width=True)
 
+# -------------------------------
 # Heatmap
+# -------------------------------
 st.subheader("Correlation Heatmap")
 corr = df[["Median_Income", "Unemployment_Norm", "Cost_Norm", "Resilience_Score"]].corr()
 fig, ax = plt.subplots()
 sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
 st.pyplot(fig)
 
+# -------------------------------
 # Folium Map with WMS Layer
+# -------------------------------
 st.subheader("Interactive Map with WMS Layer")
 m = folium.Map(location=[35.7596, -79.0193], zoom_start=7)
 wms_url = "https://gis11.services.ncdot.gov/arcgis/services/NCDOT_CountyBdy_Poly/MapServer/WMSServer"
@@ -156,7 +182,9 @@ folium.raster_layers.WmsTileLayer(
 ).add_to(m)
 folium_static(m)
 
+# -------------------------------
 # Download Button
+# -------------------------------
 st.download_button(
     label="Download County Resilience Scores",
     data=df.to_csv(index=False),
@@ -164,7 +192,9 @@ st.download_button(
     mime="text/csv"
 )
 
+# -------------------------------
 # Methodology
+# -------------------------------
 st.markdown("### Methodology & FAQ")
 st.markdown("""
 **What is the Resilience Score?**  
