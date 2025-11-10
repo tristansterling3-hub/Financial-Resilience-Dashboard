@@ -2,6 +2,10 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
+import seaborn as sns
+import matplotlib.pyplot as plt
+import folium
+from streamlit_folium import folium_static
 
 # Page setup
 st.set_page_config(page_title="NC County Resilience Dashboard", layout="wide")
@@ -69,26 +73,6 @@ st.sidebar.write(f"- Income: {w_income:.2f}")
 st.sidebar.write(f"- Unemployment: {w_unemp:.2f}")
 st.sidebar.write(f"- Cost: {w_cost:.2f}")
 
-
-# AI Assistant // Ai Generated
-st.sidebar.markdown("---")
-st.sidebar.subheader("🧠 AI Assistant")
-user_question = st.sidebar.text_area("Ask about future risks or interventions")
-
-if user_question:
-    st.sidebar.markdown("**AI Response:**")
-    q = user_question.lower()
-    if "flood" in q:
-        st.sidebar.write("Eastern counties like Craven and Pamlico may face elevated flood risk next month. Consider pre-positioning shelters and medical supplies.")
-    elif "low-income" in q:
-        st.sidebar.write("Low-income counties with low resilience scores should receive priority for housing repair grants and mobile health units.")
-    elif "hurricane" in q:
-        st.sidebar.write("Post-hurricane resource allocation should focus on counties with high population density and low resilience scores, such as Robeson and Columbus.")
-    elif "intervention" in q or "resource" in q:
-        st.sidebar.write("Use resilience scores to guide proactive interventions. Prioritize counties with low scores and high population density.")
-    else:
-        st.sidebar.write("I'm analyzing your question. Try asking about specific risks, counties, or interventions.")
-
 # Normalize income
 df["Income_Norm"] = (df["Median_Income"] - df["Median_Income"].min()) / (df["Median_Income"].max() - df["Median_Income"].min())
 
@@ -152,29 +136,25 @@ fig_map = px.choropleth(
 fig_map.update_geos(fitbounds="locations", visible=False)
 st.plotly_chart(fig_map, use_container_width=True)
 
-# Score Breakdown Table
-st.subheader("Resilience Score Breakdown")
-breakdown_df = df[[
-    "County", "Median_Income", "Income_Norm", "Resilience_Score"
-]].copy()
-breakdown_df.columns = [
-    "County", "Median Income", "Income (Normalized)", "Resilience Score"
-]
-st.dataframe(breakdown_df.round(3), use_container_width=True)
+# Heatmap
+st.subheader("Correlation Heatmap")
+corr = df[["Median_Income", "Unemployment_Norm", "Cost_Norm", "Resilience_Score"]].corr()
+fig, ax = plt.subplots()
+sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
+st.pyplot(fig)
 
-# Top & Bottom Rankings
-st.subheader("County Resilience Rankings")
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown("Top 5 Most Resilient Counties")
-    top5 = df.sort_values("Resilience_Score", ascending=False).head(5)[["County", "Resilience_Score"]]
-    st.dataframe(top5, use_container_width=True)
-
-with col2:
-    st.markdown("Bottom 5 Least Resilient Counties")
-    bottom5 = df.sort_values("Resilience_Score", ascending=True).head(5)[["County", "Resilience_Score"]]
-    st.dataframe(bottom5, use_container_width=True)
+# Folium Map with WMS Layer
+st.subheader("Interactive Map with WMS Layer")
+m = folium.Map(location=[35.7596, -79.0193], zoom_start=7)
+wms_url = "https://gis11.services.ncdot.gov/arcgis/services/NCDOT_CountyBdy_Poly/MapServer/WMSServer"
+folium.raster_layers.WmsTileLayer(
+    url=wms_url,
+    name="NCDOT County Boundaries",
+    layers="0",
+    format="image/png",
+    transparent=True
+).add_to(m)
+folium_static(m)
 
 # Download Button
 st.download_button(
@@ -185,7 +165,7 @@ st.download_button(
 )
 
 # Methodology
-st.markdown("Methodology & FAQ")
+st.markdown("### Methodology & FAQ")
 st.markdown("""
 **What is the Resilience Score?**  
 A data-driven estimate of how well a county could financially withstand a crisis.
