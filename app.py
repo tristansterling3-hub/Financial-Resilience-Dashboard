@@ -4,6 +4,7 @@ import requests
 import plotly.express as px
 import folium
 from streamlit_folium import folium_static
+import json
 
 # -------------------------------
 # Page setup
@@ -11,9 +12,9 @@ from streamlit_folium import folium_static
 st.set_page_config(page_title="NC County Resilience Dashboard", layout="wide")
 
 # -------------------------------
-# Load Census data
+# Load Census data (cached for 24h)
 # -------------------------------
-@st.cache_data
+@st.cache_data(ttl=86400)
 def load_census_data():
     API_KEY = "c3b895c40dc66379b8b94a7716a0832ebea452d7"
     url = f"https://api.census.gov/data/2022/acs/acs5?get=NAME,B19013_001E&for=county:*&in=state:37&key={API_KEY}"
@@ -35,22 +36,13 @@ def load_census_data():
     df["County"] = df["NAME"].str.replace(" County, North Carolina", "", regex=False)
     return df
 
+# -------------------------------
+# Load GeoJSON locally (faster)
+# -------------------------------
 @st.cache_data
 def load_geojson():
-    url = "https://raw.githubusercontent.com/sieger1010/NorthCarolina-GeoJson/main/NCCountiesComplete.geo.json"
-    response = requests.get(url)
-
-    if response.status_code != 200:
-        st.error("Failed to fetch GeoJSON data. Please check the URL or network connection.")
-        st.stop()
-
-    try:
-        geojson = response.json()
-    except Exception as e:
-        st.error(f"Failed to parse GeoJSON data: {e}")
-        st.stop()
-
-    return geojson
+    with open("NCCountiesComplete.geo.json") as f:  # keep this file in your project folder
+        return json.load(f)
 
 df = load_census_data()
 geojson = load_geojson()
@@ -156,16 +148,25 @@ user_question = st.sidebar.text_area("Ask about counties or resilience")
 
 if user_question:
     st.sidebar.markdown("**AI Response:**")
-    if "lowest" in user_question.lower():
+    q = user_question.lower()
+    if "lowest" in q:
         low = df.sort_values("Resilience_Score").head(5)[["County","Resilience_Score"]]
         st.sidebar.write("Lowest resilience counties:")
         st.sidebar.write(low)
-    elif "highest" in user_question.lower():
+    elif "highest" in q:
         high = df.sort_values("Resilience_Score", ascending=False).head(5)[["County","Resilience_Score"]]
         st.sidebar.write("Highest resilience counties:")
         st.sidebar.write(high)
+    elif "below" in q:
+        try:
+            threshold = float(q.split("below")[-1].strip())
+            below = df[df["Resilience_Score"] < threshold][["County","Resilience_Score"]]
+            st.sidebar.write(f"Counties below {threshold}:")
+            st.sidebar.write(below)
+        except:
+            st.sidebar.write("Please specify a numeric threshold after 'below'.")
     else:
-        st.sidebar.write("Try asking about 'highest' or 'lowest' resilience counties.")
+        st.sidebar.write("Try asking about 'highest', 'lowest', or 'below <number>' resilience counties.")
 
 # -------------------------------
 # Download Button
@@ -186,6 +187,3 @@ st.markdown("""
 Currently, unemployment and cost of living are placeholders.  
 This helps identify vulnerable communities and guide equitable resource allocation.
 """)
-
-st.title("Test App")
-st.write("If you see this, Streamlit is working!")
