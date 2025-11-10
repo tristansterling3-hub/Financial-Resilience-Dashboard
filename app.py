@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
-import seaborn as sns
-import matplotlib.pyplot as plt
 import folium
 from streamlit_folium import folium_static
 
@@ -20,59 +18,30 @@ def load_census_data():
     API_KEY = "c3b895c40dc66379b8b94a7716a0832ebea452d7"
     url = f"https://api.census.gov/data/2022/acs/acs5?get=NAME,B19013_001E&for=county:*&in=state:37&key={API_KEY}"
     response = requests.get(url)
-
-    if response.status_code != 200:
-        st.error(f"Census API request failed with status code {response.status_code}")
-        st.text(response.text)
-        st.stop()
-
-    try:
-        data = response.json()
-    except Exception as e:
-        st.error(f"Failed to parse JSON: {e}")
-        st.text(response.text)
-        st.stop()
-
+    data = response.json()
     df = pd.DataFrame(data[1:], columns=data[0])
     df.rename(columns={"B19013_001E": "Median_Income"}, inplace=True)
     df["Median_Income"] = pd.to_numeric(df["Median_Income"], errors="coerce")
     df["County"] = df["NAME"].str.replace(" County, North Carolina", "", regex=False)
     return df
 
-# -------------------------------
-# Load hosted GeoJSON
-# -------------------------------
 @st.cache_data
 def load_geojson():
     url = "https://raw.githubusercontent.com/sieger1010/NorthCarolina-GeoJson/main/NCCountiesComplete.geo.json"
     response = requests.get(url)
-
-    if response.status_code != 200:
-        st.error(f"GeoJSON request failed with status code {response.status_code}")
-        st.text(response.text)
-        st.stop()
-
-    try:
-        geojson = response.json()
-    except Exception as e:
-        st.error(f"Failed to parse GeoJSON: {e}")
-        st.text(response.text)
-        st.stop()
-
-    return geojson
+    return response.json()
 
 df = load_census_data()
 geojson = load_geojson()
 
 # -------------------------------
-# Sidebar: Weight sliders
+# Sidebar: Weights
 # -------------------------------
 st.sidebar.header("Adjust Score Weights")
 w_income = st.sidebar.slider("Weight: Income", 0.0, 1.0, 1.0, 0.05)
 w_unemp = st.sidebar.slider("Weight: Unemployment", 0.0, 1.0, 0.0, 0.05)
 w_cost = st.sidebar.slider("Weight: Cost of Living", 0.0, 1.0, 0.0, 0.05)
 
-# Normalize weights
 total = w_income + w_unemp + w_cost
 w_income, w_unemp, w_cost = w_income / total, w_unemp / total, w_cost / total
 
@@ -88,9 +57,6 @@ df["Income_Norm"] = (df["Median_Income"] - df["Median_Income"].min()) / (df["Med
 df["Unemployment_Norm"] = 0.5   # placeholder
 df["Cost_Norm"] = 0.5           # placeholder
 
-# -------------------------------
-# Resilience Score
-# -------------------------------
 df["Resilience_Score"] = (
     w_income * df["Income_Norm"] +
     w_unemp * (1 - df["Unemployment_Norm"]) +
@@ -110,18 +76,9 @@ selected_county = st.selectbox("Select a County", df["County"].sort_values())
 score = df[df["County"] == selected_county]["Resilience_Score"].values[0]
 st.metric(label=f"{selected_county} Resilience Score", value=round(score, 3))
 
-# Rank
 rank = df.sort_values("Resilience_Score", ascending=False).reset_index(drop=True)
 position = rank[rank["County"] == selected_county].index[0] + 1
 st.markdown(f"{selected_county} ranks #{position} out of {len(df)} counties.")
-
-# Insight
-income = df[df["County"] == selected_county]["Income_Norm"].values[0]
-comment = []
-if income > 0.75: comment.append("strong income levels")
-elif income < 0.4: comment.append("low income levels")
-insight = "This score reflects " + ", ".join(comment) + "." if comment else "This county has balanced income levels."
-st.markdown(f"Insight: {insight}")
 
 # -------------------------------
 # Bar Chart
@@ -137,21 +94,17 @@ fig_bar = px.bar(
 st.plotly_chart(fig_bar, use_container_width=True)
 
 # -------------------------------
-# Choropleth Map (dynamic scale)
+# Choropleth Map
 # -------------------------------
 st.subheader("North Carolina County Resilience Map")
-color_scale = st.sidebar.selectbox("Color Scale", ["Viridis", "Plasma", "Cividis", "Inferno", "Turbo"])
-min_val = st.sidebar.slider("Min Scale", float(df["Resilience_Score"].min()), float(df["Resilience_Score"].max()), float(df["Resilience_Score"].min()))
-max_val = st.sidebar.slider("Max Scale", float(df["Resilience_Score"].min()), float(df["Resilience_Score"].max()), float(df["Resilience_Score"].max()))
-
 fig_map = px.choropleth(
     df,
     geojson=geojson,
     locations="County",
     featureidkey="properties.NAME",
     color="Resilience_Score",
-    color_continuous_scale=color_scale,
-    range_color=[min_val, max_val],
+    color_continuous_scale="Viridis",
+    range_color=[df["Resilience_Score"].min(), df["Resilience_Score"].max()],
     labels={"Resilience_Score": "Resilience Score"},
     title="Resilience Score by County",
 )
@@ -159,16 +112,7 @@ fig_map.update_geos(fitbounds="locations", visible=False)
 st.plotly_chart(fig_map, use_container_width=True)
 
 # -------------------------------
-# Heatmap
-# -------------------------------
-st.subheader("Correlation Heatmap")
-corr = df[["Median_Income", "Unemployment_Norm", "Cost_Norm", "Resilience_Score"]].corr()
-fig, ax = plt.subplots()
-sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
-st.pyplot(fig)
-
-# -------------------------------
-# Folium Map with WMS Layer
+# Folium Map (optional WMS overlay)
 # -------------------------------
 st.subheader("Interactive Map with WMS Layer")
 m = folium.Map(location=[35.7596, -79.0193], zoom_start=7)
@@ -181,6 +125,26 @@ folium.raster_layers.WmsTileLayer(
     transparent=True
 ).add_to(m)
 folium_static(m)
+
+# -------------------------------
+# AI Assistant (basic Q&A)
+# -------------------------------
+st.sidebar.markdown("---")
+st.sidebar.subheader("🧠 AI Assistant")
+user_question = st.sidebar.text_area("Ask about counties or resilience")
+
+if user_question:
+    st.sidebar.markdown("**AI Response:**")
+    if "lowest" in user_question.lower():
+        low = df.sort_values("Resilience_Score").head(5)[["County","Resilience_Score"]]
+        st.sidebar.write("Lowest resilience counties:")
+        st.sidebar.write(low)
+    elif "highest" in user_question.lower():
+        high = df.sort_values("Resilience_Score", ascending=False).head(5)[["County","Resilience_Score"]]
+        st.sidebar.write("Highest resilience counties:")
+        st.sidebar.write(high)
+    else:
+        st.sidebar.write("Try asking about 'highest' or 'lowest' resilience counties.")
 
 # -------------------------------
 # Download Button
@@ -197,16 +161,7 @@ st.download_button(
 # -------------------------------
 st.markdown("### Methodology & FAQ")
 st.markdown("""
-**What is the Resilience Score?**  
-A data-driven estimate of how well a county could financially withstand a crisis.
-
-**What data is it based on?**  
-- Median Income (live from Census API)  
-- Placeholder values for Unemployment and Cost of Living (to be added)
-
-**Why does this matter?**  
-Helps identify vulnerable communities and guide equitable resource allocation.
-
-**Can I download the data?**  
-Yes — use the button above to export the live dataset with your selected weights.
+**Resilience Score** = Weighted combination of normalized income, unemployment, and cost of living.  
+Currently, unemployment and cost of living are placeholders.  
+This helps identify vulnerable communities and guide equitable resource allocation.
 """)
