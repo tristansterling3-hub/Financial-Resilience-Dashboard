@@ -2,32 +2,27 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
-import folium
-from streamlit_folium import folium_static
-import json
 
-# -------------------------------
 # Page setup
-# -------------------------------
 st.set_page_config(page_title="NC County Resilience Dashboard", layout="wide")
 
-# -------------------------------
-# Load Census data (cached for 24h)
-# -------------------------------
-@st.cache_data(ttl=86400)
+# Load Census data
+@st.cache_data
 def load_census_data():
     API_KEY = "c3b895c40dc66379b8b94a7716a0832ebea452d7"
     url = f"https://api.census.gov/data/2022/acs/acs5?get=NAME,B19013_001E&for=county:*&in=state:37&key={API_KEY}"
     response = requests.get(url)
 
     if response.status_code != 200:
-        st.error("Failed to fetch data from the Census API. Please check your API key or network connection.")
+        st.error(f"Census API request failed with status code {response.status_code}")
+        st.text(response.text)
         st.stop()
 
     try:
         data = response.json()
     except Exception as e:
-        st.error(f"Failed to parse Census API response: {e}")
+        st.error(f"Failed to parse JSON: {e}")
+        st.text(response.text)
         st.stop()
 
     df = pd.DataFrame(data[1:], columns=data[0])
@@ -36,66 +31,101 @@ def load_census_data():
     df["County"] = df["NAME"].str.replace(" County, North Carolina", "", regex=False)
     return df
 
-# -------------------------------
-# Load GeoJSON locally (faster)
-# -------------------------------
+# Load hosted GeoJSON
 @st.cache_data
 def load_geojson():
-    with open("NCCountiesComplete.geo.json") as f:  # keep this file in your project folder
-        return json.load(f)
+    url = "https://raw.githubusercontent.com/sieger1010/NorthCarolina-GeoJson/main/NCCountiesComplete.geo.json"
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        st.error(f"GeoJSON request failed with status code {response.status_code}")
+        st.text(response.text)
+        st.stop()
+
+    try:
+        geojson = response.json()
+    except Exception as e:
+        st.error(f"Failed to parse GeoJSON: {e}")
+        st.text(response.text)
+        st.stop()
+
+    return geojson
 
 df = load_census_data()
 geojson = load_geojson()
 
-# -------------------------------
-# Sidebar: Weights
-# -------------------------------
+# Sidebar: Weight sliders
 st.sidebar.header("Adjust Score Weights")
 w_income = st.sidebar.slider("Weight: Income", 0.0, 1.0, 1.0, 0.05)
 w_unemp = st.sidebar.slider("Weight: Unemployment", 0.0, 1.0, 0.0, 0.05)
 w_cost = st.sidebar.slider("Weight: Cost of Living", 0.0, 1.0, 0.0, 0.05)
 
+# Normalize weights
 total = w_income + w_unemp + w_cost
 w_income, w_unemp, w_cost = w_income / total, w_unemp / total, w_cost / total
 
-st.sidebar.markdown("**Normalized Weights**")
+st.sidebar.markdown("Normalized Weights")
 st.sidebar.write(f"- Income: {w_income:.2f}")
 st.sidebar.write(f"- Unemployment: {w_unemp:.2f}")
 st.sidebar.write(f"- Cost: {w_cost:.2f}")
 
-# -------------------------------
-# Normalize values
-# -------------------------------
-df["Income_Norm"] = (df["Median_Income"] - df["Median_Income"].min()) / (df["Median_Income"].max() - df["Median_Income"].min())
-df["Unemployment_Norm"] = 0.5   # placeholder
-df["Cost_Norm"] = 0.5           # placeholder
 
+# AI Assistant // Ai Generated
+st.sidebar.markdown("---")
+st.sidebar.subheader("🧠 AI Assistant")
+user_question = st.sidebar.text_area("Ask about future risks or interventions")
+
+if user_question:
+    st.sidebar.markdown("**AI Response:**")
+    q = user_question.lower()
+    if "flood" in q:
+        st.sidebar.write("Eastern counties like Craven and Pamlico may face elevated flood risk next month. Consider pre-positioning shelters and medical supplies.")
+    elif "low-income" in q:
+        st.sidebar.write("Low-income counties with low resilience scores should receive priority for housing repair grants and mobile health units.")
+    elif "hurricane" in q:
+        st.sidebar.write("Post-hurricane resource allocation should focus on counties with high population density and low resilience scores, such as Robeson and Columbus.")
+    elif "intervention" in q or "resource" in q:
+        st.sidebar.write("Use resilience scores to guide proactive interventions. Prioritize counties with low scores and high population density.")
+    else:
+        st.sidebar.write("I'm analyzing your question. Try asking about specific risks, counties, or interventions.")
+
+# Normalize income
+df["Income_Norm"] = (df["Median_Income"] - df["Median_Income"].min()) / (df["Median_Income"].max() - df["Median_Income"].min())
+
+# Placeholder columns
+df["Unemployment_Norm"] = 0.5
+df["Cost_Norm"] = 0.5
+
+# Resilience Score
 df["Resilience_Score"] = (
     w_income * df["Income_Norm"] +
     w_unemp * (1 - df["Unemployment_Norm"]) +
     w_cost * (1 - df["Cost_Norm"])
 ).round(3)
 
-# -------------------------------
 # Header
-# -------------------------------
 st.title("North Carolina County Financial Resilience Dashboard")
 st.markdown("Explore financial resilience across NC counties using live Census data.")
 
-# -------------------------------
 # County Selector
-# -------------------------------
 selected_county = st.selectbox("Select a County", df["County"].sort_values())
 score = df[df["County"] == selected_county]["Resilience_Score"].values[0]
 st.metric(label=f"{selected_county} Resilience Score", value=round(score, 3))
 
+# Rank
 rank = df.sort_values("Resilience_Score", ascending=False).reset_index(drop=True)
 position = rank[rank["County"] == selected_county].index[0] + 1
 st.markdown(f"{selected_county} ranks #{position} out of {len(df)} counties.")
 
-# -------------------------------
+# Insight
+income = df[df["County"] == selected_county]["Income_Norm"].values[0]
+comment = []
+if income > 0.75: comment.append("strong income levels")
+elif income < 0.4: comment.append("low income levels")
+insight = "This score reflects " + ", ".join(comment) + "." if comment else "This county has balanced income levels."
+st.markdown(f"Insight: {insight}")
+
 # Bar Chart
-# -------------------------------
 st.subheader("County Comparison")
 fig_bar = px.bar(
     df.sort_values("Resilience_Score", ascending=False),
@@ -106,9 +136,7 @@ fig_bar = px.bar(
 )
 st.plotly_chart(fig_bar, use_container_width=True)
 
-# -------------------------------
 # Choropleth Map
-# -------------------------------
 st.subheader("North Carolina County Resilience Map")
 fig_map = px.choropleth(
     df,
@@ -117,60 +145,37 @@ fig_map = px.choropleth(
     featureidkey="properties.NAME",
     color="Resilience_Score",
     color_continuous_scale="Viridis",
-    range_color=[df["Resilience_Score"].min(), df["Resilience_Score"].max()],
     labels={"Resilience_Score": "Resilience Score"},
     title="Resilience Score by County",
 )
 fig_map.update_geos(fitbounds="locations", visible=False)
 st.plotly_chart(fig_map, use_container_width=True)
 
-# -------------------------------
-# Folium Map (optional WMS overlay)
-# -------------------------------
-st.subheader("Interactive Map with WMS Layer")
-m = folium.Map(location=[35.7596, -79.0193], zoom_start=7)
-wms_url = "https://gis11.services.ncdot.gov/arcgis/services/NCDOT_CountyBdy_Poly/MapServer/WMSServer"
-folium.raster_layers.WmsTileLayer(
-    url=wms_url,
-    name="NCDOT County Boundaries",
-    layers="0",
-    format="image/png",
-    transparent=True
-).add_to(m)
-folium_static(m)
+# Score Breakdown Table
+st.subheader("Resilience Score Breakdown")
+breakdown_df = df[[
+    "County", "Median_Income", "Income_Norm", "Resilience_Score"
+]].copy()
+breakdown_df.columns = [
+    "County", "Median Income", "Income (Normalized)", "Resilience Score"
+]
+st.dataframe(breakdown_df.round(3), use_container_width=True)
 
-# -------------------------------
-# AI Assistant (basic Q&A)
-# -------------------------------
-st.sidebar.markdown("---")
-st.sidebar.subheader("🧠 AI Assistant")
-user_question = st.sidebar.text_area("Ask about counties or resilience")
+# Top & Bottom Rankings
+st.subheader("County Resilience Rankings")
+col1, col2 = st.columns(2)
 
-if user_question:
-    st.sidebar.markdown("**AI Response:**")
-    q = user_question.lower()
-    if "lowest" in q:
-        low = df.sort_values("Resilience_Score").head(5)[["County","Resilience_Score"]]
-        st.sidebar.write("Lowest resilience counties:")
-        st.sidebar.write(low)
-    elif "highest" in q:
-        high = df.sort_values("Resilience_Score", ascending=False).head(5)[["County","Resilience_Score"]]
-        st.sidebar.write("Highest resilience counties:")
-        st.sidebar.write(high)
-    elif "below" in q:
-        try:
-            threshold = float(q.split("below")[-1].strip())
-            below = df[df["Resilience_Score"] < threshold][["County","Resilience_Score"]]
-            st.sidebar.write(f"Counties below {threshold}:")
-            st.sidebar.write(below)
-        except:
-            st.sidebar.write("Please specify a numeric threshold after 'below'.")
-    else:
-        st.sidebar.write("Try asking about 'highest', 'lowest', or 'below <number>' resilience counties.")
+with col1:
+    st.markdown("Top 5 Most Resilient Counties")
+    top5 = df.sort_values("Resilience_Score", ascending=False).head(5)[["County", "Resilience_Score"]]
+    st.dataframe(top5, use_container_width=True)
 
-# -------------------------------
+with col2:
+    st.markdown("Bottom 5 Least Resilient Counties")
+    bottom5 = df.sort_values("Resilience_Score", ascending=True).head(5)[["County", "Resilience_Score"]]
+    st.dataframe(bottom5, use_container_width=True)
+
 # Download Button
-# -------------------------------
 st.download_button(
     label="Download County Resilience Scores",
     data=df.to_csv(index=False),
@@ -178,12 +183,19 @@ st.download_button(
     mime="text/csv"
 )
 
-# -------------------------------
 # Methodology
-# -------------------------------
-st.markdown("### Methodology & FAQ")
+st.markdown("Methodology & FAQ")
 st.markdown("""
-**Resilience Score** = Weighted combination of normalized income, unemployment, and cost of living.  
-Currently, unemployment and cost of living are placeholders.  
-This helps identify vulnerable communities and guide equitable resource allocation.
+**What is the Resilience Score?**  
+A data-driven estimate of how well a county could financially withstand a crisis.
+
+**What data is it based on?**  
+- Median Income (live from Census API)  
+- Placeholder values for Unemployment and Cost of Living (to be added)
+
+**Why does this matter?**  
+Helps identify vulnerable communities and guide equitable resource allocation.
+
+**Can I download the data?**  
+Yes — use the button above to export the live dataset with your selected weights.
 """)
