@@ -1,4 +1,6 @@
 # Financial-Resilience
+![Dashboard Preview](Screenshot_2025-11-16_dashboard.png)
+
 North Carolina County Resilience Dashboard
 
 A real-time data dashboard using live U.S. Census income data + a high-resolution NC county map.
