@@ -183,9 +183,9 @@ fig = px.bar(
 st.plotly_chart(fig, use_container_width=True)
 
 
-# -----------------------------
-# Choropleth Map
-# -----------------------------
+# ---------------------------------------------
+# 🗺️ NC County Resilience Map (Dynamic Colors)
+# ---------------------------------------------
 st.subheader("🗺️ NC County Resilience Map")
 
 fig_map = px.choropleth(
@@ -194,9 +194,29 @@ fig_map = px.choropleth(
     locations="County",
     featureidkey="properties.NAME",
     color="Resilience_Score",
-    color_continuous_scale="Viridis",
+    hover_name="County",
+    color_continuous_scale=[
+        "#ff0000",  # low resilience (red)
+        "#ffa500",  # medium low (orange)
+        "#ffff00",  # medium (yellow)
+        "#90ee90",  # medium high (light green)
+        "#008000"   # high (green)
+    ],
+    range_color=(df["Resilience_Score"].min(), df["Resilience_Score"].max()),
 )
-fig_map.update_geos(fitbounds="locations", visible=False)
+
+# Make the map zoom correctly around NC
+fig_map.update_geos(
+    fitbounds="locations",
+    visible=False
+)
+
+# Smooth color transitions
+fig_map.update_layout(
+    margin={"r": 0, "t": 30, "l": 0, "b": 0},
+    transition_duration=600  # smooth animation
+)
+
 st.plotly_chart(fig_map, use_container_width=True)
 
 
