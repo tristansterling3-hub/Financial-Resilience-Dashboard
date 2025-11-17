@@ -3,73 +3,72 @@
 
 North Carolina County Resilience Dashboard
 
-A real-time data dashboard using live U.S. Census income data + a high-resolution NC county map.
-
-Project Preview
+A real-time data dashboard using live U.S. Census income data and a high-resolution North Carolina county map.
 
 Overview
 
-The NC County Resilience Dashboard visualizes financial resilience across all 100 North Carolina counties using real-time Census income data and a dynamic scoring model.
+The NC County Resilience Dashboard visualizes financial resilience across all 100 North Carolina counties using real-time Census income data and an adjustable scoring model.
 
 Users can:
 
-Adjust weights (Income, Unemployment, Cost of Living)
+Adjust weighting for Income, Unemployment, and Cost of Living
 
-Compare counties
+Compare counties using interactive charts
 
-Interact with a high-resolution NC map
+Explore a high-resolution geographic map
 
-Get AI-assisted insights on risks & interventions
+Receive basic rule-based insights regarding county risks and resource needs
 
-This is designed for policy analysts, emergency planners, nonprofits, and researchers.
+This dashboard is intended for policy analysts, emergency planners, nonprofits, researchers, or anyone needing a clear overview of financial resilience across NC counties.
 
 Features
 Real-Time Resilience Scoring
 
-The score blends:
+The score incorporates:
 
-Median Income (live from Census API)
+Median Income (via live Census API)
 
-Unemployment (placeholder, upgrade ready)
+Unemployment (placeholder for future upgrade)
 
-Cost of Living (placeholder, upgrade ready)
+Cost of Living (placeholder for future upgrade)
 
 High-Resolution NC Map
 
-A custom GeoJSON file renders all NC counties with:
+A custom GeoJSON file provides:
 
-Smooth borders
+Detailed county borders
 
-Dynamic coloring
+Dynamic coloring based on resilience
 
-Interactive hover tooltips
+Interactive hover information
 
 Visual Tools
 
-Bar chart ranking counties
+Bar chart ranking counties by resilience
 
 Detailed breakdown table
 
-Selected-county insight summary
+Insight summary for selected counties
 
-Export button for CSV scores
+CSV export of resilience scores
 
 Sidebar AI Assistant
 
-Rule-based assistant that gives suggestions for:
+A simple rule-based assistant offering suggestions related to:
 
 Flood risk
 
 Hurricane preparation
 
-Low-income resource allocation
+Low-income county support
 
-County-level interventions
+County-level resource planning
 
 How the Resilience Score Works
 
-Each factor is normalized to 0–1.
-The formula:
+Each factor is normalized to a value between 0 and 1.
+
+Formula:
 
 Resilience Score =
    (Income Weight × Income_Norm)
@@ -79,31 +78,33 @@ Resilience Score =
 
 Meaning:
 
-Higher income → more resilience
+Higher income increases resilience
 
-Higher unemployment → less resilience
+Higher unemployment reduces resilience
 
-Higher cost of living → less resilience
+Higher cost of living reduces resilience
 
 Data Sources
 Income Data (Live)
 
 U.S. Census Bureau
+
 ACS 2022 5-Year Estimates
+
 Table B19013: Median Household Income
 
-GeoJSON
+Geographic Data
 
-High-resolution NC county boundaries.
+High-resolution NC county boundary polygons (GeoJSON)
 
 Future Enhancements
 
-Real unemployment + cost-of-living datasets
+Integration of real unemployment and cost-of-living datasets
 
-AI assistant powered by OpenAI
+AI assistant using a large language model
 
-County economic history trends
+County economic trend visualizations
 
 Disaster vulnerability indicators
 
-API endpoint for resilience exports
+REST API for resilience score querying
