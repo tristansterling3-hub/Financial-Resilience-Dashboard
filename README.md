@@ -3,9 +3,9 @@ North Carolina County Resilience Dashboard
 
 A real-time data dashboard using live U.S. Census income data + a high-resolution NC county map.
 
-🖼️ Project Preview
+Project Preview
 
-🌟 Overview
+Overview
 
 The NC County Resilience Dashboard visualizes financial resilience across all 100 North Carolina counties using real-time Census income data and a dynamic scoring model.
 
@@ -21,8 +21,8 @@ Get AI-assisted insights on risks & interventions
 
 This is designed for policy analysts, emergency planners, nonprofits, and researchers.
 
-🚀 Features
-📈 Real-Time Resilience Scoring
+Features
+Real-Time Resilience Scoring
 
 The score blends:
 
@@ -32,7 +32,7 @@ Unemployment (placeholder, upgrade ready)
 
 Cost of Living (placeholder, upgrade ready)
 
-🗺️ High-Resolution NC Map
+High-Resolution NC Map
 
 A custom GeoJSON file renders all NC counties with:
 
@@ -42,7 +42,7 @@ Dynamic coloring
 
 Interactive hover tooltips
 
-📊 Visual Tools
+Visual Tools
 
 Bar chart ranking counties
 
@@ -52,7 +52,7 @@ Selected-county insight summary
 
 Export button for CSV scores
 
-🤖 Sidebar AI Assistant
+Sidebar AI Assistant
 
 Rule-based assistant that gives suggestions for:
 
@@ -83,7 +83,7 @@ Higher unemployment → less resilience
 
 Higher cost of living → less resilience
 
-🗂️ Data Sources
+Data Sources
 Income Data (Live)
 
 U.S. Census Bureau
@@ -94,7 +94,7 @@ GeoJSON
 
 High-resolution NC county boundaries.
 
-🔮 Future Enhancements
+Future Enhancements
 
 Real unemployment + cost-of-living datasets
 
